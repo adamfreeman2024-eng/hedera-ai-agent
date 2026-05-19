@@ -8,6 +8,9 @@ type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
+  requiresConfirmation?: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pendingData?: any;
 };
 
 // Մոկ տվյալներ կատալոգի համար
@@ -17,6 +20,27 @@ const products = [
   { id: 3, name: 'Vertex 27" 4K Monitor', desc: "IPS panel, 144Hz, HDR400 — ideal for design and development.", price: 45, category: "DISPLAYS" },
   { id: 4, name: "Nexus USB-C Dock", desc: "12-in-1 hub with dual HDMI, 1GbE, and 100W pass-through charging.", price: 6.25, category: "ACCESSORIES" },
 ];
+
+// Տեքստի գեղեցիկ ֆորմատավորում (Bold և Սեղմվող Link-եր)
+const formatMessage = (text: string) => {
+  const parts = text.split(/(\*\*.*?\*\*|\[.*?\]\(.*?\))/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i} className="text-white font-bold">{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith('[') && part.includes('](') && part.endsWith(')')) {
+      const match = part.match(/\[(.*?)\]\((.*?)\)/);
+      if (match) {
+        return (
+          <a key={i} href={match[2]} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-emerald-400 bg-emerald-400/10 hover:bg-emerald-400/20 px-2 py-0.5 rounded-md transition-colors underline-offset-2">
+            {match[1]}
+          </a>
+        );
+      }
+    }
+    return <span key={i}>{part}</span>;
+  });
+};
 
 export default function CheckoutPage() {
   // Մաքուր Native React State-ներ
@@ -31,13 +55,21 @@ export default function CheckoutPage() {
   }, [messages]);
 
   // Նամակ ուղարկելու Գլխավոր Ֆունկցիան
-  const sendMessage = async (text: string) => {
-    if (!text.trim() || isLoading) return;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sendMessage = async (text: string, isConfirmation = false, pendingData: any = null) => {
+    if (!text.trim() && !isConfirmation) return;
+    if (isLoading) return;
 
-    // Ավելացնում ենք մարդու նամակը չատում
-    const newUserMsg: Message = { id: Date.now().toString(), role: "user", content: text };
-    setMessages((prev) => [...prev, newUserMsg]);
-    setInput("");
+    if (!isConfirmation) {
+      // Date.now()-ի փոխարեն օգտագործում ենք crypto.randomUUID()
+      const newUserMsg: Message = { id: crypto.randomUUID(), role: "user", content: text };
+      setMessages((prev) => [...prev, newUserMsg]);
+      setInput("");
+    } else {
+      // Եթե սեղմել է YES, նախորդ կոճակները թաքցնում ենք
+      setMessages((prev) => prev.map((m) => (m.requiresConfirmation ? { ...m, requiresConfirmation: false } : m)));
+    }
+
     setIsLoading(true);
 
     try {
@@ -45,7 +77,12 @@ export default function CheckoutPage() {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, messages: [...messages, newUserMsg] }),
+        body: JSON.stringify({ 
+          message: text, 
+          messages: [...messages], 
+          confirmed: isConfirmation, 
+          intentData: pendingData 
+        }),
       });
 
       if (!res.ok) throw new Error("Սերվերի խնդիր");
@@ -54,16 +91,18 @@ export default function CheckoutPage() {
       
       // Ավելացնում ենք Գործակալի պատասխանը
       const newAssistantMsg: Message = {
-        id: (Date.now() + 1).toString(),
+        id: crypto.randomUUID(), // Նորից անվտանգ ID
         role: "assistant",
         content: data.reply || data.message || "✅ Տրանզակցիան հաջողությամբ կատարվեց:",
+        requiresConfirmation: data.requiresConfirmation,
+        pendingData: data.pendingData,
       };
       setMessages((prev) => [...prev, newAssistantMsg]);
 
     } catch (error) {
       console.error("API Error:", error);
       const errorMsg: Message = {
-        id: (Date.now() + 1).toString(),
+        id: crypto.randomUUID(),
         role: "assistant",
         content: "⚠️ Կապի խափանում: Ստուգեք ձեր API բանալիները .env.local ֆայլում և տերմինալի logs-երը:",
       };
@@ -139,7 +178,30 @@ export default function CheckoutPage() {
                     : "bg-[#121212] border-zinc-800 text-emerald-50 mr-auto max-w-[95%]"
                 }`}
               >
-                {m.content}
+                {/* Տեքստի և Link-երի նկարում */}
+                {m.content.split('\n').map((line, i) => (
+                  <div key={i} className="min-h-[1.2rem] whitespace-pre-wrap">{formatMessage(line)}</div>
+                ))}
+
+                {/* YES / NO Կոճակների նկարում */}
+                {m.requiresConfirmation && (
+                  <div className="flex gap-3 mt-4 pt-4 border-t border-zinc-800/50">
+                    <button
+                      onClick={() => sendMessage("Yes, execute the transaction.", true, m.pendingData)}
+                      className="px-4 py-1.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 rounded-full text-xs font-semibold hover:bg-emerald-500/30 transition-colors"
+                    >
+                      Yes, Confirm
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMessages((prev) => prev.map((msg) => msg.id === m.id ? { ...msg, requiresConfirmation: false, content: msg.content + "\n\n❌ *Purchase cancelled by user.*" } : msg));
+                      }}
+                      className="px-4 py-1.5 bg-red-500/10 text-red-400 border border-red-500/30 rounded-full text-xs font-semibold hover:bg-red-500/20 transition-colors"
+                    >
+                      No, Cancel
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             {isLoading && (
