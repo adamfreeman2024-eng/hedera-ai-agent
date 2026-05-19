@@ -17,6 +17,7 @@
     "@hiero-ledger/sdk": "^2.84.0",
     "ai": "^6.0.185",
     "clsx": "^2.1.1",
+    "hedera-agent-kit": "^3.8.2",
     "lucide-react": "^1.16.0",
     "next": "16.2.6",
     "react": "19.2.4",
