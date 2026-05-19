@@ -1,116 +1,55 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { Client, TransferTransaction, Hbar } from "@hashgraph/sdk";
 
-import { getProductById, products } from "@/data/products";
-import { getHederaAgentKit } from "@/hedera/agent";
-import { transferProductPayment } from "@/hedera/tools";
-import { parseCheckoutIntent } from "@/lib/ai";
+const products = [
+  { id: 1, name: "Aurora Wireless Headphones", price: 12.5 },
+  { id: 2, name: "Lumen Mechanical Keyboard", price: 8.75 },
+  { id: 3, name: 'Vertex 27" 4K Monitor', price: 45 },
+  { id: 4, name: "Nexus USB-C Dock", price: 6.25 },
+];
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-const requestSchema = z.object({
-  message: z.string().min(1).max(2000),
-});
-
-export interface CheckoutApiResponse {
-  reply: string;
-  intent: string;
-  productId: string | null;
-  payment?: {
-    amountHbar: number;
-    merchantAccountId: string;
-    transactionResult: string;
-  };
-}
-
-export async function POST(request: Request): Promise<NextResponse> {
+export async function POST(req: Request) {
   try {
-    const body: unknown = await request.json();
-    const { message } = requestSchema.parse(body);
+    const { message } = await req.json();
 
-    const intent = await parseCheckoutIntent(message);
+    // Օգտագործում ենք ՔՈ ցուցակի ամենաառաջին մոդելը՝ gemini-2.5-flash
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GOOGLE_GENERATIVE_AI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `Դու E-commerce վճարային գործակալ ես: ապրանքներ՝ ${JSON.stringify(products)}. Եթե գնում է՝ JSON: {"intent": "buy", "productName": "Անվանում", "price": 12.5}. Եթե հարց է՝ JSON: {"intent": "chat", "reply": "պատասխան"}. Միայն մաքուր JSON: Հարց՝ ${message}` }] }]
+        }),
+      }
+    );
 
-    if (intent.intent === "list_products") {
-      const catalog = products
-        .map((p) => `• ${p.name} — ${p.priceInHbar} HBAR`)
-        .join("\n");
+    const result = await response.json();
 
-      return NextResponse.json({
-        reply: `${intent.reply}\n\n${catalog}`,
-        intent: intent.intent,
-        productId: null,
-      } satisfies CheckoutApiResponse);
+    if (!result.candidates) {
+        console.error("Gemini API Error:", JSON.stringify(result, null, 2));
+        throw new Error("Gemini API-ն ճիշտ չպատասխանեց");
     }
 
-    if (intent.intent === "product_info") {
-      const product = intent.productId
-        ? getProductById(intent.productId)
-        : undefined;
+    const rawText = result.candidates[0].content.parts[0].text;
+    const cleanJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const intentData = JSON.parse(cleanJson);
 
-      if (!product) {
-        return NextResponse.json({
-          reply:
-            "I could not find that product. Try asking to see all products or name an item from the catalog.",
-          intent: intent.intent,
-          productId: intent.productId,
-        } satisfies CheckoutApiResponse);
-      }
+    if (intentData.intent === "buy") {
+      const client = Client.forTestnet();
+      client.setOperator(process.env.HEDERA_ACCOUNT_ID!, process.env.HEDERA_PRIVATE_KEY!);
 
-      return NextResponse.json({
-        reply: `${intent.reply}\n\n${product.name} — ${product.priceInHbar} HBAR\n${product.description}`,
-        intent: intent.intent,
-        productId: product.id,
-      } satisfies CheckoutApiResponse);
+      const tx = await new TransferTransaction()
+        .addHbarTransfer(process.env.HEDERA_ACCOUNT_ID!, new Hbar(-intentData.price))
+        .addHbarTransfer(process.env.MERCHANT_ACCOUNT_ID!, new Hbar(intentData.price))
+        .execute(client);
+
+      return NextResponse.json({ reply: `✅ Գնումն ավարտված է: **${intentData.productName}**\n\n🔗 Hash: ${tx.transactionId.toString()}` });
     }
 
-    if (intent.intent === "checkout") {
-      if (!intent.productId) {
-        return NextResponse.json({
-          reply:
-            "Which product would you like to buy? You can say the product name or pick one from the catalog on the left.",
-          intent: intent.intent,
-          productId: null,
-        } satisfies CheckoutApiResponse);
-      }
-
-      const product = getProductById(intent.productId);
-
-      if (!product) {
-        return NextResponse.json({
-          reply:
-            "That product is not in our catalog. Please choose one of the items shown on the left.",
-          intent: intent.intent,
-          productId: intent.productId,
-        } satisfies CheckoutApiResponse);
-      }
-
-      const { api } = getHederaAgentKit();
-      const payment = await transferProductPayment(api, { product });
-
-      return NextResponse.json({
-        reply: `${intent.reply}\n\nPayment sent: ${product.name} for ${product.priceInHbar} HBAR.\n${payment.transactionResult}`,
-        intent: intent.intent,
-        productId: product.id,
-        payment: {
-          amountHbar: payment.amountHbar,
-          merchantAccountId: payment.merchantAccountId,
-          transactionResult: payment.transactionResult,
-        },
-      } satisfies CheckoutApiResponse);
-    }
-
-    return NextResponse.json({
-      reply: intent.reply,
-      intent: intent.intent,
-      productId: intent.productId,
-    } satisfies CheckoutApiResponse);
+    return NextResponse.json({ reply: intentData.reply || "Չհասկացա:" });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Checkout request failed";
-
-    console.error("[checkout]", error);
-
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("API Error:", error);
+    return NextResponse.json({ reply: "⚠️ Սերվերի Սխալ: Ստուգեք կոնսոլը:" }, { status: 500 });
   }
 }
