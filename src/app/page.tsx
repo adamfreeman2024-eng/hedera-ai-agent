@@ -2,6 +2,7 @@
 
 import { Send, Sparkles, ShoppingBag } from "lucide-react";
 import { useState, useRef, useEffect, FormEvent } from "react";
+import Image from "next/image"; // Ավելացրել ենք Next.js-ի պաշտոնական Image կոմպոնենտը
 
 // Խիստ տիպավորում մեր նամակների համար (ԶՐՈ 'any')
 type Message = {
@@ -13,12 +14,12 @@ type Message = {
   pendingData?: any;
 };
 
-// Մոկ տվյալներ կատալոգի համար
+// Մոկ տվյալներ կատալոգի համար (ՆՈՐ, ԼԵԳԵՆԴԱՐ ԱՊՐԱՆՔՆԵՐԸ)
 const products = [
-  { id: 1, name: "Aurora Wireless Headphones", desc: "Noise-cancelling over-ear headphones with 32-hour battery life.", price: 12.5, category: "AUDIO" },
-  { id: 2, name: "Lumen Mechanical Keyboard", desc: "Low-profile mechanical switches with per-key RGB and USB-C.", price: 8.75, category: "PERIPHERALS" },
-  { id: 3, name: 'Vertex 27" 4K Monitor', desc: "IPS panel, 144Hz, HDR400 — ideal for design and development.", price: 45, category: "DISPLAYS" },
-  { id: 4, name: "Nexus USB-C Dock", desc: "12-in-1 hub with dual HDMI, 1GbE, and 100W pass-through charging.", price: 6.25, category: "ACCESSORIES" },
+  { id: 1, name: "10,000 BTC Pizza", desc: "The legendary pizza that cost 10,000 BTC in 2010. Own a piece of history.", price: 1.0, category: "HISTORY", image: "/pizza.png" },
+  { id: 2, name: "OG CryptoPunk #001", desc: "The absolute classic of the NFT world. Pure digital art.", price: 5.5, category: "NFT", image: "/punk.png" },
+  { id: 3, name: "Golden Hashgraph Node", desc: "A rare digital representation of a Hedera mainnet node.", price: 2.2, category: "TECH", image: "/node.png" },
+  { id: 4, name: "Vintage Web 1.0 Cursor", desc: "The original glowing arrow from the early internet era.", price: 0.5, category: "MEMORIES", image: "/cursor.png" },
 ];
 
 // Տեքստի գեղեցիկ ֆորմատավորում (Bold և Սեղմվող Link-եր)
@@ -139,12 +140,21 @@ export default function CheckoutPage() {
           <div>
             <h2 className="text-2xl font-semibold text-white mb-2">Catalog</h2>
             <p className="text-zinc-400 text-sm">
-              Premium tech accessories priced in HBAR. Select an item or ask the assistant to check out.
+              Premium digital assets priced in HBAR. Select an item or ask the assistant to check out.
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {products.map((p) => (
               <div key={p.id} className="p-5 rounded-2xl border border-zinc-800 bg-[#121212] hover:border-zinc-700 transition-colors">
+                {/* Օպտիմիզացված Next.js նկարը */}
+                <Image 
+                  src={p.image} 
+                  alt={p.name} 
+                  width={400} 
+                  height={200} 
+                  className="w-full h-32 object-cover rounded-xl mb-4" 
+                />
+                
                 <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-2 block">{p.category}</span>
                 <h3 className="font-medium text-white mb-2">{p.name}</h3>
                 <p className="text-xs text-zinc-400 mb-4 h-12">{p.desc}</p>
@@ -167,7 +177,7 @@ export default function CheckoutPage() {
 
           <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
             <div className="bg-[#121212] border border-zinc-800 p-4 rounded-2xl text-sm text-zinc-300">
-              Hi — I can help you browse products and complete checkout with HBAR on Hedera. Try &quot;Show me what&apos;s available&quot; or &quot;Buy the Aurora headphones&quot;.
+              Hi — I can help you browse products and complete checkout with HBAR on Hedera. Try &quot;Show me what&apos;s available&quot; or &quot;Buy the 10,000 BTC Pizza&quot;.
             </div>
             {messages.map((m) => (
               <div
@@ -214,11 +224,11 @@ export default function CheckoutPage() {
 
           <div className="mt-auto space-y-3">
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => sendMessage("Buy Aurora headphones")} className="px-3 py-1.5 rounded-full border border-zinc-800 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
-                Buy Aurora
+              <button onClick={() => sendMessage("Buy the 10,000 BTC Pizza")} className="px-3 py-1.5 rounded-full border border-zinc-800 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
+                Buy BTC Pizza
               </button>
-              <button onClick={() => sendMessage("Buy Lumen keyboard")} className="px-3 py-1.5 rounded-full border border-zinc-800 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
-                Buy Lumen
+              <button onClick={() => sendMessage("Buy the Golden Node")} className="px-3 py-1.5 rounded-full border border-zinc-800 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
+                Buy Golden Node
               </button>
             </div>
             
@@ -227,7 +237,7 @@ export default function CheckoutPage() {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="I want to buy the Aurora Wireless Headphones..."
+                placeholder="I want to buy the 10,000 BTC Pizza..."
                 className="w-full bg-[#121212] border border-zinc-800 rounded-full py-3 pl-5 pr-12 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 transition-all"
                 disabled={isLoading}
               />

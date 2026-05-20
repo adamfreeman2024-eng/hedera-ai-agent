@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { Client, TransferTransaction, Hbar } from "@hashgraph/sdk";
 import { HederaAIToolkit } from "hedera-agent-kit"; 
 
+// ՆՈՐ ԼԵԳԵՆԴԱՐ ԱՊՐԱՆՔՆԵՐԸ ԲԵՔԵՆԴՈՒՄ (AI-ի համար)
 const products = [
-  { id: 1, name: "Aurora Wireless Headphones", price: 12.5 },
-  { id: 2, name: "Lumen Mechanical Keyboard", price: 8.75 },
-  { id: 3, name: 'Vertex 27" 4K Monitor', price: 45 },
-  { id: 4, name: "Nexus USB-C Dock", price: 6.25 },
+  { id: 1, name: "10,000 BTC Pizza", price: 1.0 },
+  { id: 2, name: "OG CryptoPunk #001", price: 5.5 },
+  { id: 3, name: "Golden Hashgraph Node", price: 2.2 },
+  { id: 4, name: "Vintage Web 1.0 Cursor", price: 0.5 },
 ];
 
 export async function POST(req: Request) {
@@ -33,14 +34,14 @@ export async function POST(req: Request) {
       });
     }
 
-    // ԵԹԵ ՆՈՐ ՀԱՐՑ Է, ԿԱՆՉՈՒՄ ԵՆՔ AI-ԻՆ (Անգլերենով)
+    // ԵԹԵ ՆՈՐ ՀԱՐՑ Է, ԿԱՆՉՈՒՄ ԵՆՔ AI-ԻՆ
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GOOGLE_GENERATIVE_AI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: `You are an AI E-commerce checkout agent on Hedera. Products: ${JSON.stringify(products)}. If the user wants to buy, return ONLY JSON: {"intent": "buy", "productName": "Name", "price": 12.5}. If it's a general question, return ONLY JSON: {"intent": "chat", "reply": "Your answer in English"}. Only raw JSON. User message: ${message}` }] }]
+          contents: [{ parts: [{ text: `You are an AI E-commerce checkout agent on Hedera. Products available: ${JSON.stringify(products)}. If the user wants to buy a product from the list, return ONLY JSON: {"intent": "buy", "productName": "Exact Name", "price": ExactPrice}. If it's a general question or the product is not in the list, return ONLY JSON: {"intent": "chat", "reply": "Your answer in English"}. Only return raw JSON without markdown formatting. User message: ${message}` }] }]
         }),
       }
     );
@@ -56,8 +57,8 @@ export async function POST(req: Request) {
     if (intentData.intent === "buy") {
       return NextResponse.json({
         reply: `Are you sure you want to pay **${intentData.price} HBAR** for the **${intentData.productName}**?`,
-        requiresConfirmation: true, // Սա ֆրոնտենդին կասի, որ կոճակներ նկարի
-        pendingData: intentData     // Պահպանում ենք տվյալները հաջորդ քայլի համար
+        requiresConfirmation: true, 
+        pendingData: intentData     
       });
     }
 
